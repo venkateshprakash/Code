@@ -1,0 +1,1074 @@
+#include <ESP8266WiFi.h>
+#include <EEPROM.h>
+
+ESP8266WiFiMulti wifiMulti;
+
+#define BOOT_AFTER_UPDATE true
+
+WiFiServer server(80); //Initialize the server on Port 80
+
+char ssid1[35] = {'\0'};
+char pass1[35] = {'\0'};
+
+char host[55]    = {'\0'};
+char hostPort[10]= {'\0'};
+
+char server_user[35] = {'\0'};
+char server_pass[35] = {'\0'};
+
+
+int32_t httpPort = 0; 
+int html_main = 0, html_advance = 0;
+char data[400],data1[200];
+String s,s1,s2,s3,s31,s33,s37,s4,url;
+
+char prefix[50]   = {0};
+char deviceID[30] = "81020112";
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+int passwordss1 = 0, passwordss2 = 0, passwordss3 = 0, i = 0;
+int buzzer_state = 0; 
+
+int modee = 0;
+
+const short int BUZZER = 16;
+const short int BUTTON = 5; 
+const short int  sensorPin = 4; // variable for D2 pin
+
+const short int RELAY = 14; 
+
+void html_init()
+{  
+  s = "HTTP/1.1 200 OK\r\n";
+  s += "Content-Type: text/html\r\n\r\n";
+  s += "<!DOCTYPE HTML>\r\n<html>\r\n"; 
+  s += "<head>";
+  s += "<style>";
+  
+  s += "h1"; 
+  s += "{";
+   s += "background-color: red;";
+  s += "}";
+  
+  s += ".center"; 
+  s += "{";
+   s += "margin: auto;";
+   s += "width: 60%;";
+   s += "border-radius: 25px;";
+   s += "border: 3px solid #73AD21;";
+   s += "padding: 10px;";
+   s += "width: 290px;";
+   s += "height: 25px;";
+  s += "}";
+    
+  s += "mark"; 
+  s += "{"; 
+   s += "background-color: black;";
+   s += "color: red;";
+  s += "}";
+  
+  s += "p.thick"; 
+  s += "{";
+   s += "font-weight: bold;";
+  s += "}";
+  
+  s += ".button"; 
+  s += "{";
+   s += "background-color: cyan;"; 
+   s += "border: none;";
+   s += "color: blue;";
+   s += "padding: 5px 25px;";
+   s += "text-align: center;";
+   s += "text-decoration: none;";
+   s += "display: inline-block;";
+   s += "font-size: 16px;";
+   s += "margin: 4px 2px;";
+   s += "cursor: pointer;";
+  s += "}";
+  
+  s += ".button {border-radius: 10px;}";
+  
+  s += "input";
+  s += "{";
+   s += "-moz-border-radius: 15px;";
+   s += "border-radius: 15px;";
+   s += "border:solid 1px black;";
+   s += "padding:5px;";
+  s += "}";
+    
+  s += ".newspaper3";
+  s += "{";
+   s += "-webkit-column-count: 3;";
+   s += "-moz-column-count: 3;";
+   s += "column-count: 3;";
+  s += "}";
+    
+  s += ".newspaper2";
+  s += "{";
+   s += "-webkit-column-count: 2;";
+   s += "-moz-column-count: 2;";
+   s += "column-count: 2;";
+  s += "}";
+  
+  s += ".greenText{ background-color:green; color: #fff; }";
+  s += ".blueText{ background-color:blue; color: #fff; }";
+  s += ".redText{ background-color:red; color: #fff;}";
+  s += ".orangeText{ background-color:orange; color: #fff;}";
+  
+  s += "</style>";
+  s += "</head>";
+  
+  s += "<h1 style=\"color:white;\" align=\"center\">IoT AUTOMATION</h1>";
+  
+  s += "<h2 style=\"color:blue;\" class=\"center\" align=\"center\">CONFIGURATION</h2>";
+  s += "<br>";
+}
+
+
+int16_t n = 0;
+
+void write_memory1(char var)
+{
+  EEPROM.write(n, var);
+  delay(10);  
+  n = n + 1;
+  EEPROM.write(n, ';');
+  delay(10); 
+  n = n + 1;
+}
+
+void write_memory1(char* var)
+{
+  int m = 0;
+  
+  for(;var[m] != '\0'; n=n+1)
+  {
+    EEPROM.write(n, var[m]);
+    delay(10);  
+    m++;  
+  }
+  EEPROM.write(n, ';');
+  delay(10); 
+  n = n + 1;
+}
+
+
+ 
+void read_memory()
+{
+  int ends = 0;
+  Aa:
+  int k = 0;
+  for(k = 0; k < 300; k++)
+    data[k] = '\0'; 
+    
+  for(k = 0; k < 300; k++)
+  {
+    data[k] = EEPROM.read(k);
+    delay(10);    
+  }
+  k = 0;
+  int m = 0;
+  int next = 0;
+
+  do
+  {
+    while(k < 300 && data[k] != ';')
+    {
+      if(next == 0)
+      {
+        if(m < 30)
+          ssid1[m] = data[k];
+      }
+        
+      else if(next == 1)
+      {
+        if(m < 30)
+          pass1[m] = data[k];
+      }
+        
+      else if(next == 2)
+      {
+        if(m < 30)
+          server_user[m] = data[k];
+      }
+        
+      else if(next == 3)
+      {
+        if(m < 32)
+          server_pass[m] = data[k];
+
+        ends = 1;
+      }
+      
+      k++; m++;
+    }
+    
+    k++;      
+    m = 0;
+    next = next+1;
+  }while(next <= 3);
+
+  if(ends == 0)
+  {
+    for(n = 0; n < 300; n=n+2)
+    {
+      EEPROM.write(n, '?');
+      delay(10);
+      EEPROM.write(n+1, ';');
+      delay(10);    
+    }
+    EEPROM.commit();
+    delay(10); 
+    for(n = 0; n < 35; n++)
+    {          
+      ssid1[n] = '\0';
+      pass1[n] = '\0';
+      server_user[n] = '\0';
+      server_pass[n] = '\0';
+    } 
+    goto Aa;   
+  }
+   
+  /*Serial.println();
+  Serial.println("Read Memory");
+  Serial.print("SSID1 : ");
+  Serial.println(ssid1);  
+  Serial.print("PASS1 : ");
+  Serial.println(pass1);
+  Serial.print("USERNAME : ");
+  Serial.println(server_user);  
+  Serial.print("PASSWORD : ");
+  Serial.println(server_pass);*/
+}
+
+
+
+void read_html_updates1()
+{ 
+  char temp_data = '\0';
+  int m = 0;
+  int ends = 0;
+  int next = 0;
+  n = 0;
+  
+  do
+  { 
+    if(n < 300) temp_data = data[n]; else temp_data = data1[n-300];    
+    while(temp_data != '=') 
+    {
+      n = n+1;       
+      if(n < 300) temp_data = data[n]; else temp_data = data1[n-300]; 
+    }
+  
+    n = n+1;   
+    m = 0;
+    
+    if(n < 300) temp_data = data[n]; else temp_data = data1[n-300];
+    while(temp_data != '&')
+    {
+      if(next == 0)       ssid1[m] = check_special_characters(n);
+        
+      else if(next == 1)  pass1[m] = check_special_characters(n); 
+        
+      else if(next == 2)  server_user[m] = check_special_characters(n); 
+        
+      else if(next == 3)  server_pass[m] = check_special_characters(n); 
+                      
+      m++;
+      n = n+1;
+      
+      if(n < 300) temp_data = data[n]; else temp_data = data1[n-300];
+    }
+    if(m == 0)
+    {
+      if(next == 0)
+        ssid1[0] = '?';
+    
+      else if(next == 1)
+        pass1[0] = '?';
+    
+      else if(next == 2)
+        server_user[0] = '?';
+    
+      else if(next == 3)
+        server_pass[0] = '?';
+    }
+    n = n+1;  
+    next = next+1;
+  }while(next <= 3);
+
+  /*Serial.println();
+  Serial.println("HTML Updates");
+  Serial.print("SSID1 : ");
+  Serial.println(ssid1);
+  
+  Serial.print("PASS1 : ");
+  Serial.println(pass1);
+  
+  Serial.print("USERNAME : ");
+  Serial.println(server_user);  
+  Serial.print("PASSWORD : ");
+  Serial.println(server_pass);*/
+}
+
+
+void configuration()
+{  
+  int inputs = 0, setting = 0;
+  int16_t i = 0;
+  
+  A:
+  
+  WiFiClient client = server.available();
+  
+  if(!client) 
+  {      
+    digitalWrite(BUZZER, HIGH);
+    delay(250);
+    digitalWrite(BUZZER, LOW);
+    delay(250);
+
+    setting++;
+
+    if(setting < 360)
+      goto A;
+  }
+  else
+  {
+    String request = client.readStringUntil('\r');
+    //Serial.println(request);
+    int j = request.length();
+
+    for(i = 0; i < 400; i++)
+    {
+      data[i] = '\0';
+
+      if(i < 200)
+        data1[i] = '\0';
+    }
+
+    i = 0;
+    int favi = 0;
+    inputs = 0;
+  
+    do
+    {
+      if(i >= 300)     
+        data1[i-300] = request[i+5];
+        
+      else
+        data[i] = request[i+5];
+
+      i++;
+    }while(i < j);
+
+    /*Serial.println();
+    Serial.println(data);
+    Serial.println(data1);*/
+    
+    html_init(); 
+
+    if(data[0] == '$')
+    {           
+      for(i = 0; i < 35; i++)
+      {          
+        ssid1[i] = '\0';
+        pass1[i] = '\0';  
+        server_user[i] = '\0'; 
+        server_pass[i] = '\0';    
+      }
+      read_html_updates1();
+      
+      html_main = 0;
+      html_main1();
+      html_validform(); 
+      
+      delay(500);
+      client.flush();
+      client.print(s); // Send the response to the client
+      client.print(s1); // Send the response to the client
+      client.print(s2); // Send the response to the client
+      client.print(s3); // Send the response to the client
+      client.print(s4); // Send the response to the client
+      delay(500);
+
+      write_memory();   
+    }
+    else if(data[0] == '@')
+    {        
+      for(j = 0; j < 55; j++)
+      {          
+        host[j] = '\0';
+        prefix[j] = '\0';
+
+        if(j < 10)
+          hostPort[j] = '\0';
+      }
+      
+      read_html_updates2();       
+      
+      html_advance = 0;
+      html_advance1();
+      html_validform_adv();
+      
+      delay(500);
+      client.flush();
+      client.print(s); // Send the response to the client
+      client.print(s1); // Send the response to the client
+      client.print(s3); // Send the response to the client
+      delay(500);        
+      
+      write_adv_memory();  
+    }
+    else if(data[0] == 'A' && data[1] == 'd' && data[2] == 'v' && data[3] == 'a' && data[4] == 'n' && data[5] == 'c' && data[6] == 'e')
+    {
+      html_advance = 1;
+      html_advance1();
+      html_validform_adv();
+      delay(500);
+      client.flush();
+      client.print(s); // Send the response to the client
+      client.print(s1); // Send the response to the client
+      client.print(s3); // Send the response to the client
+      delay(500);
+      setting = 0;
+      goto A;
+    }
+    else
+    {
+      html_main = 1;
+      html_main1();
+      html_validform(); 
+      client.flush();
+      client.print(s); // Send the response to the client
+      client.print(s1); 
+      client.print(s2); 
+      client.print(s3);
+      client.print(s31); 
+      client.print(s33); 
+      client.print(s37); 
+      client.print(s4); 
+      delay(500);
+      setting = 0;
+      goto A;
+    }    
+  }
+}
+
+void configs()
+{
+  WiFi.disconnect(); 
+  digitalWrite(BUZZER, HIGH);
+  delay(250);
+  digitalWrite(BUZZER, LOW);
+  delay(250);
+  digitalWrite(BUZZER, HIGH);
+  delay(250);
+  digitalWrite(BUZZER, LOW);
+  delay(250);
+  
+  WiFi.mode(WIFI_AP); 
+    
+  WiFi.softAP("IoT_Automation");
+    
+  server.begin(); // Start the HTTP Server
+
+  IPAddress HTTPS_ServerIP= WiFi.softAPIP(); // Obtain the IP of the Server
+  /*Serial.println();
+  Serial.print("My Local IP address: "); // Print the IP to the monitor window
+  Serial.println(HTTPS_ServerIP);*/
+  
+  configuration();
+  delay(2000);    
+
+  EEPROM.write(500, 0);
+  delay(10);
+  EEPROM.commit();
+  delay(10);
+  
+  ESP.eraseConfig();
+  delay(100);
+  ESP.restart();
+}
+
+// send confirmation
+int temp1 = 0;
+
+int temp2 = 0;
+
+int ph = 0, water = 0, liter = 0, pub_liter = 0;
+char val[3] = {'\0'};
+char pub_pay[10];
+int pre_pub_liter = 0, pre_ph = 0, pub_en = 0;
+
+int valvv = 0, pre_valvv = 0;
+
+void pubstatus()
+{ 
+  char prefixs[50];
+  int y = 0; 
+
+  if(pre_pub_liter != pub_liter)
+  {
+    pub_en = 1;
+    for(y = 0;y < 50; y++)
+    {
+        prefixs[y] = '\0';
+    } 
+    for(y = 0;server_user[y] != '\0'; y++)
+    {
+      prefixs[y] = server_user[y];
+    } 
+    prefixs[y] = '/';   prefixs[y+1] = 'f'; prefixs[y+2] = 'e'; prefixs[y+3] = 'e'; prefixs[y+4]  = 'd'; prefixs[y+5]  = 's';
+    prefixs[y+6] = '/'; prefixs[y+7] = 'W'; prefixs[y+8] = 'A'; prefixs[y+9] = 'T'; prefixs[y+10] = 'E'; prefixs[y+11] = 'R';
+  
+    pub_pay[0] = '\0';
+    pub_pay[1] = '\0';
+    pub_pay[2] = '\0';
+    pub_pay[3] = '\0';
+    pub_pay[4] = '\0';
+    pub_pay[5] = '\0';
+    pub_pay[6] = '\0';
+    pub_pay[7] = '\0';
+    pub_pay[8] = '\0';
+    pub_pay[9] = '\0';
+    
+    pub_pay[0] = (pub_liter/100)+0x30; 
+    pub_pay[1] = ((pub_liter%100)/10)+0x30;  
+    pub_pay[2] = ((pub_liter%100)%10)+0x30;   
+  
+    //Serial.print(prefixs); Serial.print(" : Payload : "); Serial.println(pub_pay);
+    
+    if (publish(prefixs, pub_pay)) 
+    {
+      //Serial.print(prefixs);
+      Serial.println("1S");
+    }
+      
+    else 
+    {
+      //Serial.print(prefixs);
+      Serial.println("1F");
+    }
+  
+    delay(500);
+    pre_pub_liter = pub_liter;
+  
+    for(y = 0;y < 50; y++)
+    {
+        prefixs[y] = '\0';
+    } 
+    for(y = 0;server_user[y] != '\0'; y++)
+    {
+      prefixs[y] = server_user[y];
+    } 
+    prefixs[y] = '/';   prefixs[y+1] = 'f'; prefixs[y+2] = 'e'; prefixs[y+3] = 'e'; prefixs[y+4]  = 'd'; prefixs[y+5]  = 's';
+    prefixs[y+6] = '/'; prefixs[y+7] = 'T'; prefixs[y+8] = 'H'; prefixs[y+9] = 'E'; prefixs[y+10] = 'F'; prefixs[y+11] = 'T';
+  
+    pub_pay[0] = '\0';
+    pub_pay[1] = '\0';
+    pub_pay[2] = '\0';
+    pub_pay[3] = '\0';
+    pub_pay[4] = '\0';
+    pub_pay[5] = '\0';
+    pub_pay[6] = '\0';
+    pub_pay[7] = '\0';
+    pub_pay[8] = '\0';
+    pub_pay[9] = '\0';
+  
+    if(pub_liter > 15)
+    {
+      pub_pay[0] = 'D';
+      pub_pay[1] = 'E';
+      pub_pay[2] = 'T';
+      pub_pay[3] = 'E';
+      pub_pay[4] = 'C';
+      pub_pay[5] = 'T';
+      pub_pay[6] = 'E';
+      pub_pay[7] = 'D';
+      pub_pay[8] = '\0';
+      pub_pay[9] = '\0';
+    }
+    else
+    {
+      pub_pay[0] = 'N';
+      pub_pay[1] = 'O';
+      pub_pay[2] = 'T';
+      pub_pay[3] = '\0';
+      pub_pay[4] = '\0';
+      pub_pay[5] = '\0';
+      pub_pay[6] = '\0';
+      pub_pay[7] = '\0';
+      pub_pay[8] = '\0';
+      pub_pay[9] = '\0';
+    }
+    
+    //Serial.print(prefixs); Serial.print(" : Payload : "); Serial.println(pub_pay);
+    
+    if (publish(prefixs, pub_pay)) 
+    {
+      //Serial.print(prefixs);
+      Serial.println("3S");
+    }
+      
+    else 
+    {
+      //Serial.print(prefixs);
+      Serial.println("3F");
+    }
+  
+    delay(500); 
+  }
+
+  if(pre_ph != ph)
+  {
+    pub_en = 1;
+    for(y = 0;y < 50; y++)
+    {
+        prefixs[y] = '\0';
+    } 
+    for(y = 0;server_user[y] != '\0'; y++)
+    {
+      prefixs[y] = server_user[y];
+    } 
+    prefixs[y] = '/';   prefixs[y+1] = 'f'; prefixs[y+2] = 'e'; prefixs[y+3] = 'e'; prefixs[y+4]  = 'd'; prefixs[y+5]  = 's';
+    prefixs[y+6] = '/'; prefixs[y+7] = 'P'; prefixs[y+8] = 'H';
+  
+    pub_pay[0] = '\0';
+    pub_pay[1] = '\0';
+    pub_pay[2] = '\0';
+    pub_pay[3] = '\0';
+    pub_pay[4] = '\0';
+    pub_pay[5] = '\0';
+    pub_pay[6] = '\0';
+    pub_pay[7] = '\0';
+    pub_pay[8] = '\0';
+    pub_pay[9] = '\0';
+    
+    pub_pay[0] = (ph/10)+0x30;
+    pub_pay[1] = (ph%10)+0x30; 
+    
+    //Serial.print(prefixs); Serial.print(" : Payload : "); Serial.println(pub_pay);
+    
+    if (client.publish(prefixs, pub_pay)) 
+    {
+      //Serial.print(prefixs);
+      Serial.println("2S");
+    }
+      
+    else 
+    {
+      //Serial.print(prefixs);
+      Serial.println("2F");
+    }
+  
+    delay(500);
+    pre_ph = ph;
+    
+    for(y = 0;y < 50; y++)
+    {
+        prefixs[y] = '\0';
+    } 
+    for(y = 0;server_user[y] != '\0'; y++)
+    {
+      prefixs[y] = server_user[y];
+    } 
+    prefixs[y] = '/';   prefixs[y+1] = 'f'; prefixs[y+2] = 'e'; prefixs[y+3] = 'e'; prefixs[y+4]  = 'd'; prefixs[y+5]  = 's';
+    prefixs[y+6] = '/'; prefixs[y+7] = 'A'; prefixs[y+8] = 'C'; prefixs[y+9] = 'I'; prefixs[y+10] = 'D';
+  
+    pub_pay[0] = '\0';
+    pub_pay[1] = '\0';
+    pub_pay[2] = '\0';
+    pub_pay[3] = '\0';
+    pub_pay[4] = '\0';
+    pub_pay[5] = '\0';
+    pub_pay[6] = '\0';
+    pub_pay[7] = '\0';
+    pub_pay[8] = '\0';
+    pub_pay[9] = '\0';
+  
+    if(ph < 7)
+    {
+      pub_pay[0] = 'H';
+      pub_pay[1] = 'I';
+      pub_pay[2] = 'G';
+      pub_pay[3] = 'H';
+    }
+    {
+      pub_pay[0] = 'L';
+      pub_pay[1] = 'O';
+      pub_pay[2] = 'W';
+    }
+    
+    //Serial.print(prefixs); Serial.print(" : Payload : "); Serial.println(pub_pay);
+    
+    if (client.publish(prefixs, pub_pay)) 
+    {
+      //Serial.print(prefixs);
+      Serial.println("3S");
+    }
+      
+    else 
+    {
+      //Serial.print(prefixs);
+      Serial.println("3F");
+    }
+  
+    delay(500); 
+  }
+
+  if(pre_valvv != valvv)
+  {
+    for(y = 0;y < 50; y++)
+    {
+        prefixs[y] = '\0';
+    } 
+    for(y = 0;server_user[y] != '\0'; y++)
+    {
+      prefixs[y] = server_user[y];
+    } 
+    prefixs[y] = '/';   prefixs[y+1] = 'f'; prefixs[y+2] = 'e'; prefixs[y+3] = 'e'; prefixs[y+4]  = 'd'; prefixs[y+5]  = 's';
+    prefixs[y+6] = '/'; prefixs[y+7] = 'V'; prefixs[y+8] = 'A'; prefixs[y+9] = 'L'; prefixs[y+10] = 'V'; prefixs[y+11] = 'E';
+  
+    pub_pay[0] = '\0';
+    pub_pay[1] = '\0';
+    pub_pay[2] = '\0';
+    pub_pay[3] = '\0';
+    pub_pay[4] = '\0';
+    pub_pay[5] = '\0';
+    pub_pay[6] = '\0';
+    pub_pay[7] = '\0';
+    pub_pay[8] = '\0';
+    pub_pay[9] = '\0';
+    
+    pub_pay[0] = val[0];
+    pub_pay[1] = val[1];
+    pub_pay[2] = val[2];
+    
+    //Serial.print(prefixs); Serial.print(" : Payload : "); Serial.println(pub_pay);
+    
+    if (client.publish(prefixs, pub_pay)) 
+    {
+      //Serial.print(prefixs);
+      Serial.println("4S");
+    }
+      
+    else 
+    {
+      //Serial.print(prefixs);
+      Serial.println("4F");
+    }
+  
+    delay(500);     
+    pre_valvv = valvv;
+  }
+  
+}
+/*
+int check_topic(char* topics)
+{    
+  int y = 0;
+  char prefixs[50] = {'\0'};
+
+    
+  for(y = 0;y < 50; y++)
+    prefixs[y] = '\0';
+    
+  for(y = 0;prefix[y] != '\0'; y++)
+    prefixs[y] = prefix[y];
+  
+  int mn = 0;
+  int match = 0;
+  
+  do
+  {
+    if(prefixs[mn] == topics[mn])
+      match = 1;
+    else
+      match = 0;
+    
+    mn++;
+  }while(prefixs[mn] != '\0' && match != 10);
+    
+  return match;
+}
+
+int check_payload(char* payloadss, char* msgs)
+{
+  int j = 0, return_value = 1;
+  
+  while(payloadss[j] != '\0' && return_value != 0)
+  {
+    if(payloadss[j] == msgs[j])
+      return_value = 1;
+
+    else
+      return_value = 0;
+
+    j++;
+  }
+  return return_value;
+}
+
+void wifi_status()
+{
+    int wifi_temps = 0;
+  //while(wifiMulti.run() != WL_CONNECTED) 
+  while (WiFi.status() != WL_CONNECTED) 
+  {
+    //Serial.print('.');
+    if(wifi_temps == 0)
+    {
+      digitalWrite(BUZZER, HIGH);
+      wifi_temps = 1;
+    }
+    else
+    {
+      digitalWrite(BUZZER, LOW);
+      wifi_temps = 0;      
+    }
+    buzzer_state = 1;   
+      
+    if(digitalRead(BUTTON) == LOW)
+    {
+      delay(50); if(digitalRead(BUTTON) == LOW){ delay(50); if(digitalRead(BUTTON) == LOW){delay(50); if(digitalRead(BUTTON) == LOW){
+      configs();  
+    }}}}
+    delay(500);
+  }
+}
+
+void connect_wifi()
+{
+  wifi_status();
+  //assign_ip();
+ 
+  /*Serial.println();
+  Serial.print("My Local IP address: "); // Print the IP to the monitor window
+  Serial.println(WiFi.localIP());
+  Serial.println();*/
+  digitalWrite(BUZZER, LOW);
+  buzzer_state = 0;     
+}
+
+void wifi_name()
+{
+  WiFi.begin(ssid1, pass1);
+}
+
+void inits()
+{ 
+  WiFi.disconnect(); 
+  
+  buzzer_state = 0;
+  long wait = 0;  
+  modee = 0;
+  do
+  {  
+    if(digitalRead(BUTTON) == LOW)
+    {
+      delay(50); if(digitalRead(BUTTON) == LOW){ delay(50); if(digitalRead(BUTTON) == LOW){delay(50); if(digitalRead(BUTTON) == LOW){
+      configs();  
+    }}}}
+    
+    if(wait % 1000 == 0)
+      digitalWrite(BUZZER, HIGH);
+    
+    else if(wait % 500 == 0)
+    digitalWrite(BUZZER, LOW);
+  
+    delay(1);
+    wait++; 
+  }while(wait < 3000); 
+  
+  digitalWrite(BUZZER, LOW); 
+    
+  read_memory();
+  read_adv_memory();
+  
+  digitalWrite(BUZZER, HIGH);
+      
+  WiFi.mode(WIFI_STA);
+  wifi_name();
+  connect_wifi();
+  //initVar();
+}
+
+int16_t contagem = 0;   // variable to store the “rise ups” from the flowmeter pulses
+
+void pin_ISR()
+{   
+    contagem++;
+}
+
+void set_init()
+{  
+  pinMode(BUTTON, INPUT); 
+   pinMode(sensorPin, INPUT);
+  
+  pinMode(BUZZER, OUTPUT); 
+  pinMode(RELAY, OUTPUT);
+  
+  digitalWrite(BUZZER, LOW);
+  digitalWrite(RELAY, LOW);
+   
+  attachInterrupt(digitalPinToInterrupt(sensorPin), pin_ISR, RISING);
+
+  Serial.begin(9600);
+  EEPROM.begin(512);
+  delay(10);
+}
+void connect_mqtt()
+{  
+  /*Serial.print("Host:"); Serial.println(host);
+  Serial.print("HttpPort:"); Serial.println(httpPort);
+  Serial.print("Username:"); Serial.println(username);
+  Serial.print("Password:"); Serial.println(password);*/
+  
+  //client.setServer(mqttServerName, mqttport);
+  client.setServer(host, httpPort);
+  client.setCallback(callback); 
+
+  if (client.connect(deviceID, server_user, server_pass))  
+  //if (client.connect(deviceID))  
+  {      
+    buzzer_state = 0;
+    digitalWrite(BUZZER, LOW);
+    Serial.println("ConnecteD");
+//    pubstatus();   
+
+    /*char prefixs[50];
+    int y = 0;  
+    for(y = 0;y < 50; y++)
+        prefixs[y] = '\0';
+    
+    for(y = 0;prefix[y] != '\0'; y++)
+      prefixs[y] = prefix[y];
+      
+    client.subscribe(prefixs);  
+    Serial.println("Subscribe: Success");
+    Serial.println(prefixs);
+
+    Serial.println("*S1#");*/
+  }
+  else
+  {    
+    buzzer_state = 1;
+    digitalWrite(BUZZER, HIGH);
+    //Serial.println("MQTT Not Connected");
+
+    //Serial.println("*S0#");
+  }
+  delay(2000);
+}
+
+  
+void setup()
+{
+  set_init();
+  inits();
+  connect_mqtt();
+}
+
+char ser_data[15] = {'\0'}, valv = '\0';
+int ii = 0, exits = 0, temps = 0;
+int analogValue = 0;  // variable to store the value coming from the sensor
+
+void loop() 
+{  
+  A:
+  int wait = 0; modee = 0;
+  liter = contagem/10;
+  //liter = contagem;
+
+  analogValue = analogRead(A0);
+  // map it to the range of the analog out:
+  ph = map(analogValue, 0, 1023, 0, 255);
+  ph = ph/6;
+
+  String tx_string;
+  tx_string = "*";
+  
+  if(liter < 10)       tx_string += "00";
+  else if(liter < 100) tx_string += "0";
+  tx_string += liter;
+  
+  if(ph < 10)   tx_string += "0";
+  tx_string += ph;
+  
+  if(valvv == 1)  tx_string += "1#\r\n"; 
+  else            tx_string += "0#\r\n";
+ 
+  Serial.print(tx_string);
+  Serial.print(tx_string);
+  Serial.print(tx_string);
+
+    pub_liter = liter;
+    contagem = 0;
+    liter = 0; 
+
+  if(ph < 7 || pub_liter > 15)         
+  {
+    val[0] = 'O'; val[1] = 'F'; val[2] = 'F';
+    digitalWrite(RELAY, LOW);
+    valvv = 0;
+  }
+  else 
+  {
+    val[0] = 'O'; val[1] = 'N'; val[2] = '\0';
+    digitalWrite(RELAY, HIGH);
+    valvv = 1;
+  }
+  
+  if(ph > 30) ph = 0;
+  
+  if (client.connected()) 
+  {    
+    buzzer_state = 0;
+    digitalWrite(BUZZER, LOW);
+
+    pubstatus();
+  } 
+  else
+  {
+    buzzer_state = 1;
+    digitalWrite(BUZZER, HIGH);
+    //Serial.println("Connecting to MQTT server ...");  
+    client.disconnect();
+  
+    if(WiFi.status() != WL_CONNECTED)
+    {
+      connect_wifi();
+      wait = 10000;
+    }
+    else
+      wait = 0;
+
+    modee = 0;
+    do
+    {      
+      if(digitalRead(BUTTON) == LOW)
+      {
+        delay(50); if(digitalRead(BUTTON) == LOW){ delay(50); if(digitalRead(BUTTON) == LOW){delay(50); if(digitalRead(BUTTON) == LOW){
+        configs();  
+      }}}}
+      wait++;
+      delay(1);  
+    }while(wait < 10000);
+    
+    connect_mqtt();
+    goto A;    
+  }  
+  if(pub_liter > 15)
+  {
+    while(true)
+    {
+      delay(1000);
+    }
+  }
+  client.loop();
+}
+ 
